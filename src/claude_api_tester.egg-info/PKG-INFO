@@ -1,0 +1,117 @@
+Metadata-Version: 2.4
+Name: claude-api-tester
+Version: 0.1.0
+Summary: Discover Claude models and test their API endpoints.
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: anthropic<1.0,>=0.52.0
+Requires-Dist: python-dotenv<2.0,>=1.0.0
+
+# Claude API Tester
+
+A Python CLI that discovers the Claude models available to your Anthropic API key
+and optionally checks each model with the token-count and Messages APIs.
+
+## Setup
+
+Requires Python 3.10 or newer and an Anthropic API key.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+cp .env.example .env
+```
+
+Put your key in `.env`:
+
+```dotenv
+ANTHROPIC_API_KEY=your_actual_key
+```
+
+Keep `.env` private; it is excluded from Git.
+
+## Commands
+
+List available model IDs without generating responses:
+
+```bash
+claude-api-tester list-models
+# Or run the standalone module:
+uv run python -m claude_api_tester.list_models
+# Or use the dedicated command:
+claude-list-models
+```
+
+Test token counting and a short generated response for every listed model:
+
+```bash
+claude-api-tester test-models
+```
+
+Customize the prompt, generation limit, concurrency, and optional JSON report:
+
+```bash
+claude-api-tester test-models \
+  --prompt "Return the word READY and nothing else." \
+  --max-tokens 16 \
+  --concurrency 2 \
+  --output results/claude-api-report.json
+```
+
+The report's parent directory must already exist. A failed endpoint for one model
+is recorded and does not prevent the remaining models from being tested.
+The command exits with status `1` if any endpoint check fails.
+
+## API modules
+
+The `src/claude_api_tester/` package has a separate module for each API category:
+
+- `messages.py`: create text messages.
+- `vision.py`: send a local JPEG, PNG, GIF, or WebP image in a Messages request.
+- `batch_processing.py`: submit message batches and retrieve status/results.
+- `streaming.py`: yield generated text as it arrives.
+- `files.py`: upload, list, retrieve, download, or delete files (Files API beta).
+- `models.py`: list available models and retrieve model metadata.
+- `token_counting.py`: count prompt tokens without generating a response.
+- `prompt_management.py`: save, load, render, and run local JSON prompt templates,
+  with optional system-prompt caching.
+- `admin.py`: read-only workspace listing using an Admin API key.
+- `tool_function_calling.py`: demonstrate a client-side tool call with a fixed,
+  local demo result.
+
+These modules accept an `anthropic.Anthropic` client so they can be used from
+Python code. Example:
+
+```python
+from anthropic import Anthropic
+
+from claude_api_tester.models import list_models
+from claude_api_tester.token_counting import count_tokens
+from claude_api_tester.messages import create_message
+
+client = Anthropic()
+model = list_models(client)[0]
+print(count_tokens(client, model, "Say hello").input_tokens)
+print(create_message(client, model, "Say hello", max_tokens=32).content)
+```
+
+Prompt templates are local because the Anthropic API does not provide a hosted
+prompt-template CRUD API. Prompt caching is a separate Messages API feature.
+The Admin API example requires `ANTHROPIC_ADMIN_API_KEY`; create its client
+explicitly with `Anthropic(api_key=...)` and do not use your regular API key.
+
+## API coverage and cost
+
+The existing `test-models` CLI command tests Messages and token counting for
+each model returned by the Models API. The other API modules are callable from
+Python as shown above. Message generation, vision, batch submission, file
+uploads, and tool use can incur charges or create stored resources. The Files
+module includes deletion as an explicit function; no cleanup runs automatically.
+Batch processing can take up to 24 hours to complete.
+
+## Run tests
+
+```bash
+python -m unittest discover -s tests
+```

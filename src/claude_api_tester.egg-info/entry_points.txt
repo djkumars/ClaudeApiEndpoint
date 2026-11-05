@@ -1,0 +1,3 @@
+[console_scripts]
+claude-api-tester = claude_api_tester.cli:main
+claude-list-models = claude_api_tester.list_models:main
